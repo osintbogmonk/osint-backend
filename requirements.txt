@@ -1,0 +1,6 @@
+fastapi==0.95.2
+uvicorn[standard]==0.22.0
+httpx==0.24.0
+dnspython==2.4.2
+python-whois==0.7.3
+pydantic==1.10.12
