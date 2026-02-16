@@ -7,6 +7,11 @@ import re
 
 app = FastAPI(title="OSINT Backend")
 
+# Корневой маршрут — теперь / работает
+@app.get("/")
+def root():
+    return {"message": "OSINT backend is running"}
+
 class AnalyzeRequest(BaseModel):
     type: str
     value: str
@@ -20,7 +25,6 @@ def extract_domain_from_email(email: str) -> str:
 def safe_whois(domain: str):
     try:
         w = whois.whois(domain)
-        # whois.whois returns an object; convert to dict for JSON serialisation
         return dict(w) if hasattr(w, "__dict__") else w
     except Exception as e:
         return {"error": str(e)}
@@ -42,12 +46,15 @@ async def http_check(domain: str):
         try:
             r = await client.get(url)
             title = None
-            # try to extract <title> from body if present (simple)
             if r.text:
                 m = re.search(r"<title>(.*?)</title>", r.text, re.IGNORECASE | re.DOTALL)
                 if m:
                     title = m.group(1).strip()
-            return {"status_code": r.status_code, "title": title, "final_url": str(r.url)}
+            return {
+                "status_code": r.status_code,
+                "title": title,
+                "final_url": str(r.url)
+            }
         except Exception as e:
             return {"error": str(e)}
 
@@ -55,6 +62,7 @@ async def http_check(domain: str):
 async def analyze(req: AnalyzeRequest):
     t = req.type.lower()
     val = req.value.strip()
+
     if t not in ("email", "domain"):
         raise HTTPException(status_code=400, detail="type must be 'email' or 'domain'")
 
@@ -66,3 +74,13 @@ async def analyze(req: AnalyzeRequest):
     else:
         domain = val.lower()
 
+    whois_data = safe_whois(domain)
+    dns_data = dns_lookup(domain)
+    http_data = await http_check(domain)
+
+    return {
+        "domain": domain,
+        "whois": whois_data,
+        "dns": dns_data,
+        "http": http_data
+    }
